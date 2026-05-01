@@ -105,6 +105,8 @@ _answer_queues: dict[str, asyncio.Queue] = {}  # for elicitation
 def tool_fetch_pricing(service="Virtual Machines", region="eastus", top="10"):
     global _last_fetch_results
     top_n = min(int(top), 20)
+    # Normalize region: "East US" / "east us" / "East_US" → "eastus"
+    region = region.lower().replace(" ", "").replace("_", "").replace("-", "")
     url = "https://prices.azure.com/api/retail/prices"
     params = {
         "$filter": (
@@ -257,17 +259,36 @@ Respond with EXACTLY ONE line in one of these formats:
   FUNCTION_CALL: tool_name|arg1|arg2|...
   FINAL_ANSWER: <summary of what you did>
 
+CRITICAL — When to use ask_user:
+- Use ask_user BEFORE fetch_cloud_pricing if the user has NOT specified a service name.
+- Use ask_user BEFORE fetch_cloud_pricing if the user has NOT specified a region.
+- If BOTH service and region are missing, ask for service first, then region in a separate ask_user.
+- For ask_user, provide helpful options: ask_user|Which Azure service?|Virtual Machines,Storage,SQL Database,Cosmos DB,App Service
+- For region: ask_user|Which Azure region?|eastus,westus2,westeurope,southeastasia,centralus
+
+CRITICAL — NEVER repeat a question:
+- NEVER ask a question that was already answered in Previous steps.
+- If the user already told you the service, DO NOT ask for service again.
+- If the user already told you the region, DO NOT ask for region again.
+- Read the Previous steps carefully. If you see "User confirmed", use that answer.
+
+CRITICAL — Workflow order (do this EXACTLY):
+1. First, do ALL fetch_cloud_pricing calls needed (one per service+region combo, max 3 total).
+2. Then call save_to_file ONCE with a descriptive filename for the last result.
+3. Then call show_pricing_dashboard ONCE to show the final combined view.
+4. Then call export_to_csv ONCE on the saved file.
+5. Then emit FINAL_ANSWER summarizing all fetched data and files created.
+
+CRITICAL — NEVER repeat a tool call:
+- NEVER call the same tool with the same arguments twice.
+- If save_to_file or show_pricing_dashboard already succeeded in Previous steps, do NOT call it again.
+- Move on to the next step.
+
 Rules:
 - Provide arguments in the order they appear in the tool signature.
-- After each FUNCTION_CALL you receive the result — use it for the next step.
-- When all tasks are complete, emit FINAL_ANSWER.
-- For show_pricing_dashboard, pass the FILENAME from the fetch/save result (e.g. vm_pricing.json).
+- For show_pricing_dashboard, pass the FILENAME from the fetch/save result.
 - For save_to_file, just pass a filename — the last fetched data is saved automatically.
 - Do NOT pass large JSON content as arguments — use filenames instead.
-- If the user's request is vague or missing service/region, use ask_user FIRST to clarify.
-- ask_user returns the user's response. Use their answer in subsequent tool calls.
-- For ask_user options, pass a comma-separated list: ask_user|Which service?|Virtual Machines,Storage,SQL Database
-- Execute ALL requested steps. Do not stop early.
 """
 
 
@@ -334,12 +355,29 @@ async def run_agent(request: Request):
         session_id = str(uuid.uuid4())
         _answer_queues[session_id] = asyncio.Queue()
         history = []
+        known_facts = []  # track what user already told us
+        last_unrecognized = None
+        repeat_count = 0
+        recent_calls = set()  # detect duplicate tool calls
 
-        for i in range(1, 16):
+        # Map UPPER_CASE tool names the LLM invents to real tool names
+        TOOL_ALIASES = {
+            "FETCH_CLOUD_PRICING": "fetch_cloud_pricing",
+            "SAVE_TO_FILE": "save_to_file",
+            "READ_FILE": "read_file",
+            "SHOW_PRICING_DASHBOARD": "show_pricing_dashboard",
+            "EXPORT_TO_CSV": "export_to_csv",
+            "ASK_USER": "ask_user",
+        }
+
+        for i in range(1, 30):
             ctx = "\n".join(history) if history else "(none)"
+            facts = "\n".join(known_facts) if known_facts else ""
+            facts_block = f"\nConfirmed facts from user:\n{facts}\n" if facts else ""
             prompt = (
                 f"{SYSTEM_PROMPT}\n"
-                f"Task: {user_prompt}\n\n"
+                f"Task: {user_prompt}\n"
+                f"{facts_block}\n"
                 f"Previous steps:\n{ctx}\n\n"
                 f"What is your next single action?"
             )
@@ -358,24 +396,41 @@ async def run_agent(request: Request):
                 _answer_queues.pop(session_id, None)
                 return
 
-            # Robust parsing: handle FUNCTION_CALL:, ASK_USER:, or direct tool_name| formats
+            # Robust parsing: handle many LLM output formats
             call_text = None
             if text.startswith("FUNCTION_CALL:"):
                 call_text = text.split(":", 1)[1].strip()
             elif text.upper().startswith("ASK_USER:"):
-                # Handle "ASK_USER: question text" shorthand
                 q_text = text.split(":", 1)[1].strip()
                 call_text = f"ask_user|{q_text}"
             else:
-                for tname in list(TOOLS.keys()) + ["ask_user"]:
-                    if tname in text and "|" in text:
-                        idx = text.index(tname)
-                        call_text = text[idx:].strip()
+                # Check for UPPER_CASE aliases like "SAVE_TO_FILE: filename"
+                for alias, real_name in TOOL_ALIASES.items():
+                    if text.upper().startswith(alias + ":"):
+                        args_part = text.split(":", 1)[1].strip()
+                        call_text = f"{real_name}|{args_part}" if args_part else real_name
                         break
+                # Check for tool_name|arg format
+                if call_text is None:
+                    for tname in list(TOOLS.keys()) + ["ask_user"]:
+                        if tname in text and "|" in text:
+                            idx = text.index(tname)
+                            call_text = text[idx:].strip()
+                            break
 
             if call_text is None:
+                # Stuck-loop detection: if same unrecognized output repeats, bail out
+                if text == last_unrecognized:
+                    repeat_count += 1
+                else:
+                    last_unrecognized = text
+                    repeat_count = 1
+                if repeat_count >= 3:
+                    yield {"data": json.dumps({"type": "final", "text": "Agent got stuck — here's what was completed so far. Check the saved files in data/."})}
+                    _answer_queues.pop(session_id, None)
+                    return
                 yield {"data": json.dumps({"type": "thinking", "text": f"LLM: {text}"})}
-                history.append(f"Step {i}: unexpected format \u2014 {text}")
+                history.append(f"Step {i}: unexpected format — {text}. You MUST respond with FUNCTION_CALL: tool_name|args or FINAL_ANSWER: summary")
                 continue
 
             parts = [p.strip() for p in call_text.split("|")]
@@ -395,7 +450,8 @@ async def run_agent(request: Request):
                 except asyncio.TimeoutError:
                     answer = "(no response)"
                 yield {"data": json.dumps({"type": "tool_result", "result": f"User answered: {answer}"})}
-                history.append(f"Step {i}: ask_user({question}) -> User: {answer}")
+                history.append(f"Step {i}: Asked user: '{question}' \u2192 User confirmed: '{answer}'")
+                known_facts.append(f"- {question} \u2192 {answer}")
                 continue
 
             tool = TOOLS.get(func_name)
@@ -408,6 +464,13 @@ async def run_agent(request: Request):
             expected = len(tool["params"])
             if len(raw_args) > expected:
                 raw_args = raw_args[:expected - 1] + ["|".join(raw_args[expected - 1:])]
+
+            # Duplicate call detection
+            call_sig = f"{func_name}|{'|'.join(raw_args)}"
+            if call_sig in recent_calls:
+                history.append(f"Step {i}: SKIPPED duplicate {func_name} — already done. Move to the next different step.")
+                continue
+            recent_calls.add(call_sig)
 
             args_preview = ", ".join(
                 f"{p}={a[:60]}{'...' if len(a) > 60 else ''}"

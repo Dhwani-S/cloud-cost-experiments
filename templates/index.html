@@ -129,25 +129,69 @@
             background: #fff;
         }
 
-        .prompt-chips {
+        .prompt-gallery {
+            padding: 8px 30px 14px;
             display: flex;
-            gap: 8px;
-            padding: 0 30px 12px;
-            flex-wrap: wrap;
+            gap: 10px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #30363d transparent;
         }
-        .chip {
-            padding: 6px 14px;
+        .prompt-card {
+            flex: 0 0 220px;
             background: #161b22;
             border: 1px solid #30363d;
-            border-radius: 16px;
-            color: #8b949e;
-            font-size: 0.82rem;
+            border-radius: 10px;
+            padding: 14px 16px;
             cursor: pointer;
             transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
-        .chip:hover {
+        .prompt-card:hover {
             border-color: #58a6ff;
+            background: #1c2128;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .prompt-card .card-icon { font-size: 1.3rem; }
+        .prompt-card .card-title {
+            font-size: 0.85rem;
+            font-weight: 600;
             color: #e1e4e8;
+            line-height: 1.3;
+        }
+        .prompt-card .card-desc {
+            font-size: 0.75rem;
+            color: #8b949e;
+            line-height: 1.4;
+        }
+        .card-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-top: auto;
+        }
+        .card-tag {
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .tag-ask   { background: #d2992233; color: #d29922; }
+        .tag-fetch { background: #58a6ff22; color: #58a6ff; }
+        .tag-save  { background: #3fb95022; color: #3fb950; }
+        .tag-dash  { background: #bc8cff22; color: #bc8cff; }
+        .tag-csv   { background: #f0883e22; color: #f0883e; }
+        .tag-read  { background: #8b949e22; color: #8b949e; }
+        .gallery-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #484f58;
+            padding: 0 30px;
+            margin-top: 4px;
         }
 
         .divider {
@@ -172,6 +216,34 @@
             transition: all 0.2s;
         }
         .q-btn:hover { border-color: #58a6ff; background: #161b22; }
+        .q-btn.selected { border-color: #58a6ff; background: #58a6ff22; color: #58a6ff; }
+        .q-submit-row {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .q-submit-row button {
+            padding: 8px 20px; background: #238636; border: none;
+            border-radius: 6px; color: white; font-weight: 600; cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .q-submit-row button:hover { background: #2ea043; }
+        .q-submit-row .hint {
+            font-size: 0.75rem; color: #484f58;
+        }
+        .q-other-row {
+            margin-top: 8px;
+            display: none;
+            gap: 8px;
+        }
+        .q-other-row.visible { display: flex; }
+        .q-other-row input {
+            flex: 1; padding: 8px 12px; background: #0f1117;
+            border: 1px solid #30363d; border-radius: 6px;
+            color: #e1e4e8; font-size: 0.9rem; outline: none;
+        }
+        .q-other-row input:focus { border-color: #58a6ff; }
         .q-input-row {
             margin-top: 10px;
             display: flex;
@@ -202,12 +274,44 @@
         <button id="runBtn" onclick="runAgent()">Run Agent</button>
     </div>
 
-    <div class="prompt-chips">
-        <span class="chip" onclick="useChip(this)">Fetch VM pricing for eastus, save as vm_report.json, read the file back to verify, show a dashboard, and export to CSV</span>
-        <span class="chip" onclick="useChip(this)">Fetch Azure VM pricing for eastus, save it, show dashboard, and export as CSV</span>
-        <span class="chip" onclick="useChip(this)">Get Storage pricing for westus2, display a dashboard, and export to CSV</span>
-        <span class="chip" onclick="useChip(this)">Compare SQL Database pricing in westeurope — save, visualize, and export</span>
-        <span class="chip" onclick="useChip(this)">I need a cloud pricing report — help me figure out what to look for</span>
+    <div class="gallery-label">Choose a workflow — or type your own above</div>
+    <div class="prompt-gallery">
+
+        <div class="prompt-card" onclick="useCard(this)" data-prompt="I want to compare cloud costs across different regions">
+            <span class="card-icon">🌍</span>
+            <span class="card-title">Compare Regions</span>
+            <span class="card-desc">See how pricing differs for the same service across Azure regions</span>
+            <div class="card-tags"><span class="card-tag tag-ask">ask</span><span class="card-tag tag-fetch">fetch</span><span class="card-tag tag-dash">dashboard</span><span class="card-tag tag-csv">csv</span></div>
+        </div>
+
+        <div class="prompt-card" onclick="useCard(this)" data-prompt="I need a cloud pricing report">
+            <span class="card-icon">📋</span>
+            <span class="card-title">Guided Report Builder</span>
+            <span class="card-desc">Not sure what you need? Get a personalized pricing report step by step</span>
+            <div class="card-tags"><span class="card-tag tag-ask">ask ×2</span><span class="card-tag tag-fetch">fetch</span><span class="card-tag tag-save">save</span><span class="card-tag tag-dash">dashboard</span><span class="card-tag tag-csv">csv</span></div>
+        </div>
+
+        <div class="prompt-card" onclick="useCard(this)" data-prompt="Find me the cheapest compute option and generate a report">
+            <span class="card-icon">💰</span>
+            <span class="card-title">Find Cheapest Option</span>
+            <span class="card-desc">Discover the lowest-cost SKUs for your compute workload</span>
+            <div class="card-tags"><span class="card-tag tag-ask">ask</span><span class="card-tag tag-fetch">fetch</span><span class="card-tag tag-save">save</span><span class="card-tag tag-dash">dashboard</span><span class="card-tag tag-csv">csv</span></div>
+        </div>
+
+        <div class="prompt-card" onclick="useCard(this)" data-prompt="Fetch VM and Storage pricing for eastus, save both, show a combined dashboard, and export each to CSV">
+            <span class="card-icon">🔄</span>
+            <span class="card-title">Multi-Service Fetch</span>
+            <span class="card-desc">Get VM and Storage pricing side by side in one report</span>
+            <div class="card-tags"><span class="card-tag tag-fetch">fetch ×2</span><span class="card-tag tag-save">save ×2</span><span class="card-tag tag-dash">dashboard</span><span class="card-tag tag-csv">csv ×2</span></div>
+        </div>
+
+        <div class="prompt-card" onclick="useCard(this)" data-prompt="Get SQL Database pricing for westeurope, save as sql_west.json, read it back to verify, show a dashboard, then export to CSV">
+            <span class="card-icon">🗄️</span>
+            <span class="card-title">SQL Database Report</span>
+            <span class="card-desc">Full pricing breakdown for Azure SQL Database in West Europe</span>
+            <div class="card-tags"><span class="card-tag tag-fetch">fetch</span><span class="card-tag tag-save">save</span><span class="card-tag tag-read">read</span><span class="card-tag tag-dash">dashboard</span><span class="card-tag tag-csv">csv</span></div>
+        </div>
+
     </div>
 
     <div class="content">
@@ -238,9 +342,12 @@
         const promptEl = document.getElementById('prompt');
         const runBtn = document.getElementById('runBtn');
 
-        function useChip(el) {
-            promptEl.value = el.textContent;
+        function useCard(el) {
+            promptEl.value = el.dataset.prompt;
             promptEl.focus();
+            // highlight selected
+            document.querySelectorAll('.prompt-card').forEach(c => c.style.borderColor = '');
+            el.style.borderColor = '#58a6ff';
         }
 
         function addStep(type, html) {
@@ -355,16 +462,64 @@
             let html = '<span class="icon">❓</span><span class="label">Agent asks:</span> ' + esc(text);
             if (options.length) {
                 html += '<div class="q-options">';
-                for (const opt of options) html += '<button class="q-btn" onclick="submitAnswer(this.textContent)">' + esc(opt) + '</button>';
+                for (const opt of options) {
+                    html += '<button class="q-btn" onclick="toggleOption(this)">' + esc(opt) + '</button>';
+                }
+                html += '<button class="q-btn" onclick="toggleOther(this)" data-other="true">Other</button>';
                 html += '</div>';
+                html += '<div class="q-other-row" id="other-row"><input type="text" id="other-input" placeholder="Specify other..." /></div>';
+                html += '<div class="q-submit-row"><button onclick="submitMultiAnswer()">Submit</button><span class="hint">Select one or more options</span></div>';
+            } else {
+                html += '<div class="q-input-row">'
+                    + '<input type="text" id="elicit-input" placeholder="Type your answer..." onkeydown="if(event.key===\'Enter\')submitAnswer()" />'
+                    + '<button onclick="submitAnswer()">Send</button></div>';
             }
-            html += '<div class="q-input-row">'
-                + '<input type="text" id="elicit-input" placeholder="Type your answer..." onkeydown="if(event.key===\'Enter\')submitAnswer()" />'
-                + '<button onclick="submitAnswer()">Send</button></div>';
             div.innerHTML = html;
             stepsEl.appendChild(div);
             stepsEl.scrollTop = stepsEl.scrollHeight;
-            setTimeout(() => document.getElementById('elicit-input')?.focus(), 100);
+        }
+
+        function toggleOption(btn) {
+            if (btn.dataset.other) return;
+            btn.classList.toggle('selected');
+        }
+
+        function toggleOther(btn) {
+            btn.classList.toggle('selected');
+            const row = document.getElementById('other-row');
+            if (row) {
+                row.classList.toggle('visible', btn.classList.contains('selected'));
+                if (btn.classList.contains('selected')) {
+                    setTimeout(() => document.getElementById('other-input')?.focus(), 50);
+                }
+            }
+        }
+
+        async function submitMultiAnswer() {
+            const selected = [];
+            document.querySelectorAll('#active-question .q-btn.selected').forEach(b => {
+                if (!b.dataset.other) selected.push(b.textContent);
+            });
+            const otherBtn = document.querySelector('#active-question .q-btn[data-other].selected');
+            if (otherBtn) {
+                const otherVal = (document.getElementById('other-input')?.value || '').trim();
+                if (otherVal) selected.push(otherVal);
+            }
+            if (!selected.length) return;
+            const answer = selected.join(', ');
+            const qDiv = document.getElementById('active-question');
+            if (qDiv) {
+                qDiv.className = 'step done';
+                qDiv.id = '';
+                const extras = qDiv.querySelectorAll('.q-options, .q-other-row, .q-submit-row, .q-input-row');
+                extras.forEach(e => e.remove());
+                qDiv.innerHTML += '<div class="detail">You answered: ' + esc(answer) + '</div>';
+            }
+            await fetch('/api/answer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({session_id: currentSessionId, answer})
+            });
         }
 
         async function submitAnswer(preset) {
@@ -375,7 +530,7 @@
             if (qDiv) {
                 qDiv.className = 'step done';
                 qDiv.id = '';
-                const extras = qDiv.querySelectorAll('.q-options, .q-input-row');
+                const extras = qDiv.querySelectorAll('.q-options, .q-other-row, .q-submit-row, .q-input-row');
                 extras.forEach(e => e.remove());
                 qDiv.innerHTML += '<div class="detail">You answered: ' + esc(answer) + '</div>';
             }
