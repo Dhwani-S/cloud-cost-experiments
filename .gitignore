@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .env
 data/
+dashboard_data.json
+prefab_server.log

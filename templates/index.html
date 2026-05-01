@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinOps Pricing Scout</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0f1117;
+            color: #e1e4e8;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 16px 30px;
+            border-bottom: 1px solid #21262d;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        header h1 { font-size: 1.3rem; font-weight: 600; }
+        .badge {
+            background: #238636;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .input-bar {
+            padding: 16px 30px;
+            border-bottom: 1px solid #21262d;
+            display: flex;
+            gap: 12px;
+        }
+        .input-bar input {
+            flex: 1;
+            padding: 12px 16px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            color: #e1e4e8;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .input-bar input:focus { border-color: #58a6ff; }
+        .input-bar input::placeholder { color: #484f58; }
+        .input-bar button {
+            padding: 12px 24px;
+            background: #238636;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: background 0.2s;
+        }
+        .input-bar button:hover { background: #2ea043; }
+        .input-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .panel {
+            flex: 1;
+            background: #0f1117;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 12px 20px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #8b949e;
+            border-bottom: 1px solid #21262d;
+            font-weight: 600;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+        }
+
+        .step {
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            background: #161b22;
+            border-left: 3px solid transparent;
+            font-size: 0.88rem;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        .step.thinking { border-left-color: #f0883e; }
+        .step.tool     { border-left-color: #58a6ff; }
+        .step.done     { border-left-color: #3fb950; }
+        .step.error    { border-left-color: #f85149; }
+        .step .icon { margin-right: 8px; }
+        .step .label { font-weight: 600; margin-right: 6px; }
+        .step .detail { color: #8b949e; font-size: 0.82rem; margin-top: 4px; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #484f58;
+        }
+        .empty-state .big { font-size: 2.5rem; margin-bottom: 12px; }
+        .empty-state p { font-size: 0.95rem; }
+
+        .dashboard-panel iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .prompt-chips {
+            display: flex;
+            gap: 8px;
+            padding: 0 30px 12px;
+            flex-wrap: wrap;
+        }
+        .chip {
+            padding: 6px 14px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 16px;
+            color: #8b949e;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .chip:hover {
+            border-color: #58a6ff;
+            color: #e1e4e8;
+        }
+
+        .divider {
+            width: 6px;
+            background: #21262d;
+            cursor: col-resize;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+        .divider:hover, .divider.active { background: #58a6ff; }
+
+        .step.question { border-left-color: #d29922; }
+        .q-options { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+        .q-btn {
+            padding: 6px 14px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #e1e4e8;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .q-btn:hover { border-color: #58a6ff; background: #161b22; }
+        .q-input-row {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+        }
+        .q-input-row input {
+            flex: 1; padding: 8px 12px; background: #0f1117;
+            border: 1px solid #30363d; border-radius: 6px;
+            color: #e1e4e8; font-size: 0.9rem; outline: none;
+        }
+        .q-input-row input:focus { border-color: #58a6ff; }
+        .q-input-row button {
+            padding: 8px 16px; background: #238636; border: none;
+            border-radius: 6px; color: white; font-weight: 600; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <span style="font-size: 1.4rem;">☁️</span>
+        <h1>FinOps Pricing Scout</h1>
+        <span class="badge">MCP Agent</span>
+    </header>
+
+    <div class="input-bar">
+        <input id="prompt" type="text"
+               placeholder="e.g. Fetch Azure VM pricing for eastus, save to file, and show me a dashboard" />
+        <button id="runBtn" onclick="runAgent()">Run Agent</button>
+    </div>
+
+    <div class="prompt-chips">
+        <span class="chip" onclick="useChip(this)">Fetch VM pricing for eastus, save as vm_report.json, read the file back to verify, show a dashboard, and export to CSV</span>
+        <span class="chip" onclick="useChip(this)">Fetch Azure VM pricing for eastus, save it, show dashboard, and export as CSV</span>
+        <span class="chip" onclick="useChip(this)">Get Storage pricing for westus2, display a dashboard, and export to CSV</span>
+        <span class="chip" onclick="useChip(this)">Compare SQL Database pricing in westeurope — save, visualize, and export</span>
+        <span class="chip" onclick="useChip(this)">I need a cloud pricing report — help me figure out what to look for</span>
+    </div>
+
+    <div class="content">
+        <div class="panel">
+            <div class="panel-header">Agent Steps</div>
+            <div class="panel-body" id="steps">
+                <div class="empty-state">
+                    <div class="big">🤖</div>
+                    <p>Enter a prompt above to start the agent</p>
+                </div>
+            </div>
+        </div>
+        <div id="divider" class="divider"></div>
+        <div class="panel dashboard-panel">
+            <div class="panel-header">Prefab Dashboard</div>
+            <div class="panel-body" id="dashboard" style="padding: 0;">
+                <div class="empty-state" style="padding-top: 80px;">
+                    <div class="big">📊</div>
+                    <p>Dashboard will appear here after the agent runs</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const stepsEl = document.getElementById('steps');
+        const dashEl = document.getElementById('dashboard');
+        const promptEl = document.getElementById('prompt');
+        const runBtn = document.getElementById('runBtn');
+
+        function useChip(el) {
+            promptEl.value = el.textContent;
+            promptEl.focus();
+        }
+
+        function addStep(type, html) {
+            const empty = stepsEl.querySelector('.empty-state');
+            if (empty) empty.remove();
+
+            const div = document.createElement('div');
+            div.className = 'step ' + type;
+            div.innerHTML = html;
+            stepsEl.appendChild(div);
+            stepsEl.scrollTop = stepsEl.scrollHeight;
+        }
+
+        async function runAgent() {
+            const prompt = promptEl.value.trim();
+            if (!prompt) return;
+
+            runBtn.disabled = true;
+            runBtn.textContent = 'Running...';
+            stepsEl.innerHTML = '';
+            dashEl.innerHTML = '<div class="empty-state" style="padding-top:80px;"><div class="big">⏳</div><p>Waiting for dashboard...</p></div>';
+
+            try {
+                const res = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const ev = JSON.parse(line.slice(6));
+                                handleEvent(ev);
+                            } catch (e) { /* skip malformed */ }
+                        }
+                    }
+                }
+            } catch (err) {
+                addStep('error', '<span class="icon">❌</span><span class="label">Error</span>' + err.message);
+            }
+
+            runBtn.disabled = false;
+            runBtn.textContent = 'Run Agent';
+        }
+
+        function handleEvent(ev) {
+            switch (ev.type) {
+                case 'thinking':
+                    addStep('thinking', '<span class="icon">🤖</span><span class="label">Thinking</span>' + esc(ev.text));
+                    break;
+                case 'tool_call':
+                    addStep('tool', '<span class="icon">🔧</span><span class="label">' + esc(ev.tool) + '</span>'
+                        + '<div class="detail">' + esc(ev.args || '') + '</div>');
+                    break;
+                case 'tool_result':
+                    let resultHtml = '<span class="icon">✅</span><span class="label">Result</span>'
+                        + '<div class="detail">' + esc(ev.result) + '</div>';
+                    const dlMatch = ev.result && ev.result.match(/\/api\/download\/(\S+)/);
+                    if (dlMatch) {
+                        resultHtml += '<div style="margin-top:8px;"><a href="' + esc(dlMatch[0])
+                            + '" download style="color:#58a6ff;text-decoration:none;font-weight:600;">'
+                            + '⬇️ Download ' + esc(dlMatch[1]) + '</a></div>';
+                    }
+                    addStep('done', resultHtml);
+                    break;
+                case 'dashboard_ready':
+                    addStep('done', '<span class="icon">📊</span><span class="label">Dashboard</span>Generated — loading in panel...');
+                    setTimeout(() => {
+                        dashEl.innerHTML = '<iframe src="http://localhost:5175"></iframe>';
+                    }, 2000);
+                    break;
+                case 'question':
+                    currentSessionId = ev.session_id;
+                    showQuestion(ev.text, ev.options || []);
+                    break;
+                case 'final':
+                    addStep('done', '<span class="icon">🎉</span><span class="label">Done</span>' + esc(ev.text));
+                    break;
+                case 'error':
+                    addStep('error', '<span class="icon">❌</span><span class="label">Error</span>' + esc(ev.text));
+                    break;
+            }
+        }
+
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        let currentSessionId = null;
+
+        function showQuestion(text, options) {
+            const empty = stepsEl.querySelector('.empty-state');
+            if (empty) empty.remove();
+            const div = document.createElement('div');
+            div.className = 'step question';
+            div.id = 'active-question';
+            let html = '<span class="icon">❓</span><span class="label">Agent asks:</span> ' + esc(text);
+            if (options.length) {
+                html += '<div class="q-options">';
+                for (const opt of options) html += '<button class="q-btn" onclick="submitAnswer(this.textContent)">' + esc(opt) + '</button>';
+                html += '</div>';
+            }
+            html += '<div class="q-input-row">'
+                + '<input type="text" id="elicit-input" placeholder="Type your answer..." onkeydown="if(event.key===\'Enter\')submitAnswer()" />'
+                + '<button onclick="submitAnswer()">Send</button></div>';
+            div.innerHTML = html;
+            stepsEl.appendChild(div);
+            stepsEl.scrollTop = stepsEl.scrollHeight;
+            setTimeout(() => document.getElementById('elicit-input')?.focus(), 100);
+        }
+
+        async function submitAnswer(preset) {
+            const input = document.getElementById('elicit-input');
+            const answer = preset || (input ? input.value.trim() : '');
+            if (!answer) return;
+            const qDiv = document.getElementById('active-question');
+            if (qDiv) {
+                qDiv.className = 'step done';
+                qDiv.id = '';
+                const extras = qDiv.querySelectorAll('.q-options, .q-input-row');
+                extras.forEach(e => e.remove());
+                qDiv.innerHTML += '<div class="detail">You answered: ' + esc(answer) + '</div>';
+            }
+            await fetch('/api/answer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({session_id: currentSessionId, answer})
+            });
+        }
+
+        /* ── Resizable panels ── */
+        (function() {
+            const divider = document.getElementById('divider');
+            const panels = document.querySelectorAll('.panel');
+            const left = panels[0], right = panels[1];
+            const container = document.querySelector('.content');
+            let dragging = false;
+            divider.addEventListener('mousedown', e => {
+                dragging = true;
+                divider.classList.add('active');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                const rect = container.getBoundingClientRect();
+                const pct = Math.max(20, Math.min(80, ((e.clientX - rect.left) / rect.width) * 100));
+                left.style.flex = 'none';
+                left.style.width = pct + '%';
+                right.style.flex = '1';
+            });
+            document.addEventListener('mouseup', () => {
+                if (!dragging) return;
+                dragging = false;
+                divider.classList.remove('active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            });
+        })();
+
+        promptEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !runBtn.disabled) runAgent();
+        });
+    </script>
+</body>
+</html>
