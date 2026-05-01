@@ -358,10 +358,14 @@ async def run_agent(request: Request):
                 _answer_queues.pop(session_id, None)
                 return
 
-            # Robust parsing: handle FUNCTION_CALL: or direct tool_name| formats
+            # Robust parsing: handle FUNCTION_CALL:, ASK_USER:, or direct tool_name| formats
             call_text = None
             if text.startswith("FUNCTION_CALL:"):
                 call_text = text.split(":", 1)[1].strip()
+            elif text.upper().startswith("ASK_USER:"):
+                # Handle "ASK_USER: question text" shorthand
+                q_text = text.split(":", 1)[1].strip()
+                call_text = f"ask_user|{q_text}"
             else:
                 for tname in list(TOOLS.keys()) + ["ask_user"]:
                     if tname in text and "|" in text:
@@ -377,6 +381,9 @@ async def run_agent(request: Request):
             parts = [p.strip() for p in call_text.split("|")]
             func_name = parts[0]
             raw_args = parts[1:]
+
+            # Strip key=value prefixes (e.g. "service=Virtual Machines" -> "Virtual Machines")
+            raw_args = [a.split("=", 1)[1] if "=" in a and a.split("=", 1)[0].replace("_", "").isalpha() else a for a in raw_args]
 
             # \u2500\u2500 Elicitation: ask_user \u2500\u2500
             if func_name == "ask_user":
